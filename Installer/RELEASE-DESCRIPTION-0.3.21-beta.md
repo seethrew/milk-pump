@@ -57,7 +57,8 @@ Windows 10 or 11, 64-bit. The plugin goes into the standard VST3 folder
 - The **app** listens to Windows' playback device, so it may not hear a DAW running on an ASIO
   driver. Inside the DAW, use the **plugin**.
 - Video files inside presets are switched off for now (webcam and Spout still work).
-- Windows only.
+- Windows only. It may run on Linux through Wine (the app) or yabridge (the plugin), but that is
+  untested: if you try it, open an issue and say how it went.
 
 ### Licence
 

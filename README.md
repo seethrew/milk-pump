@@ -17,6 +17,10 @@ Milk Pump runs the real MilkDrop 2 engine, through [BeatDrop](https://github.com
 `Milk Pump Presets.msi` (BeatDrop's 11,000-preset pack). The user guide is
 [Docs/Milk Pump README.txt](Docs/Milk%20Pump%20README.txt).
 
+**Linux / Mac:** Windows only. It may run on Linux through Wine (the app) or
+[yabridge](https://github.com/robbert-vdh/yabridge) (the plugin), but that is untested: if you try
+it, open an issue and say how it went.
+
 ## Building it
 
 Windows 10/11 x64, with:
