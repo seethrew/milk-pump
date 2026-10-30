@@ -82,10 +82,10 @@
    * Double-click for full screen. Close the window to quit.
 
      .------------------------------------------------------------------.
-     |  ASIO: a DAW on an ASIO driver (Elektron Overbridge, ASIO4ALL...) |
-     |  sends its sound straight to the hardware, around Windows, so the |
-     |  app may not hear it. Inside the DAW, use the PLUGIN: it gets the |
-     |  sound directly, whatever the driver.                             |
+     |  ASIO: a DAW on an ASIO driver sends its sound straight to the    |
+     |  hardware, around Windows, so the app may not hear it. Inside the |
+     |  DAW, use the PLUGIN: it gets the sound directly, whatever the    |
+     |  driver.                                                          |
      '------------------------------------------------------------------'
 
   ============================================================================
