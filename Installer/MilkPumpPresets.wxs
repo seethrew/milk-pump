@@ -1,0 +1,29 @@
+<!-- Milk Pump Presets: BeatDrop's full pack (its presets in their own folders and 1.2 GB of
+     textures), into the data folder, Documents\Milk Pump. A separate installer (Daxy, 2026-10-30:
+     "have presets separate"), so it can be skipped, and removing Milk Pump leaves it. Holds only
+     files the Milk Pump installer does not (build-installer.ps1 takes those out), so neither
+     uninstall removes the other's files. -->
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs" xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui">
+  <Package Name="Milk Pump Presets" Manufacturer="seethrew" Version="$(Version)" Scope="perMachine"
+           UpgradeCode="0C9E7A54-2B1F-4E3D-8A6C-71F2D4B9E805" Compressed="yes">
+    <MajorUpgrade DowngradeErrorMessage="A newer Milk Pump Presets is already installed." />
+    <MediaTemplate EmbedCab="yes" CompressionLevel="low" />
+
+    <Icon Id="MilkPump.ico" SourceFile="$(IconFile)" />
+    <Property Id="ARPPRODUCTICON" Value="MilkPump.ico" />
+    <Property Id="ARPCOMMENTS" Value="BeatDrop's full preset and texture pack for Milk Pump." />
+
+    <ui:WixUI Id="WixUI_Minimal" />
+    <WixVariable Id="WixUILicenseRtf" Value="$(LicenseRtf)" />
+    <WixVariable Id="WixUIDialogBmp" Value="$(DialogBmp)" />
+    <WixVariable Id="WixUIBannerBmp" Value="$(BannerBmp)" />
+
+    <StandardDirectory Id="PersonalFolder">
+      <Directory Id="DATAFOLDER" Name="Milk Pump" />
+    </StandardDirectory>
+
+    <Feature Id="Main" Title="Milk Pump Presets">
+      <Files Directory="DATAFOLDER" Include="$(DataDir)\**" />
+    </Feature>
+  </Package>
+</Wix>

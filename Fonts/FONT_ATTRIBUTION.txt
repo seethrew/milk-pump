@@ -1,0 +1,35 @@
+Fonts: Ac437 EagleSpCGA Alt2 (the panel's main face) and Ac437 IBM DOS ISO8-2x
+       (the DOS skin)
+       [2026-09-25: EagleSpCGA Alt2 added here - it is the panel font and is
+       bundled, but this file only named the IBM face. Same pack, author,
+       copyright and licence as below.]
+From: The Ultimate Oldschool PC Font Pack v2.2
+Author: VileR (https://int10h.org/oldschool-pc-fonts/)
+Copyright: (c) 2016-2020 VileR
+Licence: Creative Commons Attribution-ShareAlike 4.0 International (CC BY-SA 4.0)
+          https://creativecommons.org/licenses/by-sa/4.0/
+          Full text in FONT_LICENSE_CC-BY-SA-4.0.txt
+
+Attribution is REQUIRED wherever this plugin is distributed. Reproduce the
+lines above in the plugin credits and in the manual.
+
+Both font files are bundled unmodified. Bundling an unmodified work inside an
+application is a collection, not an adaptation, and CC BY-SA 4.0 explicitly
+permits the technical format-shifting needed to embed it; text rendered with a
+font is not adapted material. ShareAlike therefore does not extend to
+SwarmSynth Revived, which remains under its own BSD-2-Clause terms. If the
+glyphs themselves are ever edited, that edit must be CC BY-SA 4.0.
+
+------------------------------------------------------------------------------
+
+Font: Figtree Medium (file Figtree-Medium.ttf) - used by the ABLETON skin
+From: https://github.com/erikdkennedy/figtree
+Copyright: (c) 2022 The Figtree Project Authors
+Licence: SIL Open Font License, Version 1.1
+          Full text in FONT_LICENSE_Figtree_OFL.txt
+
+The OFL permits bundling and embedding the font in software, including
+commercial software, provided the licence and copyright notice travel with it
+and the font is not sold on its own. It does not extend to SwarmSynth Revived,
+which remains BSD-2-Clause. Credit it alongside VileR in the plugin credits
+and the manual.

@@ -1,0 +1,30 @@
+# Built, fetched or installed: setup.ps1 and build.ps1 make these again.
+/build/
+/Tools/JUCE/
+/Tools/vcpkg/
+/Tools/vcpkg-cache/
+/Tools/vcpkg-scratch/
+/Tools/D3DX/
+/Tools/DXSDK/
+/Tools/redist/
+/Tools/wix/
+/Tools/*.log
+/vcpkg_installed/
+/Reference/
+/Standalone/
+/VST3/
+/App/
+/Installer/*.msi
+/Installer/*.wixpdb
+/Installer/.wix/
+
+# This PC's own: settings, working notes, shortcuts.
+/local-settings.ps1
+/CLAUDE.md
+/HANDOVER.md
+*.lnk
+
+# Python and editor leftovers.
+__pycache__/
+*.pyc
+.vs/

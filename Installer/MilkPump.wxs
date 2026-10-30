@@ -1,0 +1,172 @@
+<!-- Milk Pump's installer (WiX 5; built by build-installer.ps1, which passes the -d values).
+     Per machine, one UAC prompt. Three parts (Daxy, 2026-10-30: "a tick box ... vst3 and/or
+     standalone", as audio installers do):
+       Plugin      the VST3, in the standard VST3 folder (Common Files\VST3)            [tick box]
+       App         the standalone app in Program Files\Milk Pump, with a Start menu entry [tick box]
+       Essentials  always: the README (Program Files\Milk Pump, its own Start menu entry), the
+                   licences, and the data folder, Documents\Milk Pump: settings, the opening
+                   screen, fonts, our presets and the 574-preset light set.
+     The pages: Welcome, licence (the credits), What to install (the two tick boxes; Install needs
+     at least one), ready. Running it again offers Change (the same tick boxes, as installed),
+     Repair and Remove. BeatDrop's big pack is a separate installer (MilkPumpPresets.wxs).
+     Uninstall removes what this put there. It leaves: the settings files (beatdrop*.ini, kept for
+     a reinstall), and whatever the visuals made or you added (shader cache, screenshots, your own
+     presets, milkpump_app.ini). -->
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs" xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui">
+  <Package Name="Milk Pump" Manufacturer="seethrew" Version="$(Version)" Scope="perMachine"
+           UpgradeCode="6F3B2E1C-4A7D-4C2B-9E1A-5D8F0B7C3A21" Compressed="yes">
+    <MajorUpgrade DowngradeErrorMessage="A newer Milk Pump is already installed." />
+    <MediaTemplate EmbedCab="yes" CompressionLevel="high" />
+
+    <Icon Id="MilkPump.ico" SourceFile="$(IconFile)" />
+    <Property Id="ARPPRODUCTICON" Value="MilkPump.ico" />
+    <Property Id="ARPCOMMENTS" Value="MilkDrop music visuals: an app that reacts to whatever the PC plays, and a VST3 plugin." />
+
+    <UIRef Id="MilkPumpUI" />
+    <WixVariable Id="WixUILicenseRtf" Value="$(LicenseRtf)" />
+    <WixVariable Id="WixUIDialogBmp" Value="$(DialogBmp)" />
+    <WixVariable Id="WixUIBannerBmp" Value="$(BannerBmp)" />
+
+    <!-- The tick boxes: ticked (1) or empty. Both ticked on a fresh install (and a silent one). -->
+    <Property Id="INSTALL_PLUGIN" Value="1" Secure="yes" />
+    <Property Id="INSTALL_APP" Value="1" Secure="yes" />
+    <!-- Running it again: each box starts as that part is installed. -->
+    <SetProperty Id="INSTALL_PLUGIN" Value="{}" After="CostFinalize" Sequence="ui"
+                 Condition="Installed AND (!Plugin &lt;&gt; 3)" />
+    <SetProperty Id="INSTALL_APP" Value="{}" After="CostFinalize" Sequence="ui"
+                 Condition="Installed AND (!App &lt;&gt; 3)" />
+
+    <StandardDirectory Id="ProgramFiles64Folder">
+      <Directory Id="APPFOLDER" Name="Milk Pump" />
+    </StandardDirectory>
+    <StandardDirectory Id="CommonFiles64Folder">
+      <Directory Id="VST3FOLDER" Name="VST3">
+        <Directory Id="PLUGINFOLDER" Name="Milk Pump.vst3" />
+      </Directory>
+    </StandardDirectory>
+    <StandardDirectory Id="PersonalFolder">
+      <Directory Id="DATAFOLDER" Name="Milk Pump" />
+    </StandardDirectory>
+
+    <Feature Id="Plugin" Title="VST3 plugin" AllowAbsent="yes">
+      <Files Directory="PLUGINFOLDER" Include="$(PluginDir)\**" />
+    </Feature>
+
+    <Feature Id="App" Title="Standalone app" AllowAbsent="yes">
+      <!-- The app; its exe carries the Start menu shortcut. -->
+      <Component Directory="APPFOLDER">
+        <File Id="AppExe" Source="$(AppDir)\Milk Pump.exe" KeyPath="yes">
+          <Shortcut Id="StartMenu" Directory="ProgramMenuFolder" Name="Milk Pump" WorkingDirectory="APPFOLDER"
+                    Description="Milk Pump: MilkDrop visuals for whatever the PC is playing" Advertise="yes" Icon="MilkPump.ico" />
+        </File>
+      </Component>
+      <Files Directory="APPFOLDER" Include="$(AppDir)\**">
+        <Exclude Files="$(AppDir)\Milk Pump.exe" />
+      </Files>
+    </Feature>
+
+    <Feature Id="Essentials" Title="Presets, settings and README" AllowAbsent="no">
+      <!-- The readme (Docs\Milk Pump README.txt), with a Start menu entry of its own. -->
+      <Component Directory="APPFOLDER">
+        <File Id="Readme" Source="$(ReadmeFile)" KeyPath="yes">
+          <Shortcut Id="StartMenuReadme" Directory="ProgramMenuFolder" Name="Milk Pump README"
+                    Description="Milk Pump: how it works, keys, presets, installing" Advertise="yes" Icon="MilkPump.ico" />
+        </File>
+      </Component>
+      <Files Directory="APPFOLDER" Subdirectory="Licences" Include="$(LicenceDir)\**" />
+
+      <!-- The data folder. The settings files are never overwritten and stay after uninstall. -->
+      <Files Directory="DATAFOLDER" Include="$(DataDir)\**">
+        <Exclude Files="$(DataDir)\beatdrop.ini" />
+        <Exclude Files="$(DataDir)\beatdrop_img.ini" />
+        <Exclude Files="$(DataDir)\beatdrop_msg.ini" />
+      </Files>
+      <Component Directory="DATAFOLDER" NeverOverwrite="yes" Permanent="yes">
+        <File Source="$(DataDir)\beatdrop.ini" />
+      </Component>
+      <Component Directory="DATAFOLDER" NeverOverwrite="yes" Permanent="yes">
+        <File Source="$(DataDir)\beatdrop_img.ini" />
+      </Component>
+      <Component Directory="DATAFOLDER" NeverOverwrite="yes" Permanent="yes">
+        <File Source="$(DataDir)\beatdrop_msg.ini" />
+      </Component>
+    </Feature>
+  </Package>
+
+  <!-- The pages, built from WiX's standard dialogs plus ours (ChooseDlg). -->
+  <Fragment>
+    <UI Id="MilkPumpUI">
+      <TextStyle Id="WixUI_Font_Normal" FaceName="Tahoma" Size="8" />
+      <TextStyle Id="WixUI_Font_Bigger" FaceName="Tahoma" Size="12" />
+      <TextStyle Id="WixUI_Font_Title" FaceName="Tahoma" Size="9" Bold="yes" />
+      <Property Id="DefaultUIFont" Value="WixUI_Font_Normal" />
+      <Property Id="WixUI_Mode" Value="Custom" />
+
+      <DialogRef Id="ErrorDlg" />
+      <DialogRef Id="FatalError" />
+      <DialogRef Id="FilesInUse" />
+      <DialogRef Id="MsiRMFilesInUse" />
+      <DialogRef Id="PrepareDlg" />
+      <DialogRef Id="ProgressDlg" />
+      <DialogRef Id="ResumeDlg" />
+      <DialogRef Id="UserExit" />
+
+      <Dialog Id="ChooseDlg" Width="370" Height="270" Title="[ProductName] Setup">
+        <Control Id="BannerBitmap" Type="Bitmap" X="0" Y="0" Width="370" Height="44" TabSkip="no" Text="WixUI_Bmp_Banner" />
+        <Control Id="BannerLine" Type="Line" X="0" Y="44" Width="370" Height="0" />
+        <Control Id="BottomLine" Type="Line" X="0" Y="234" Width="370" Height="0" />
+        <Control Id="Title" Type="Text" X="15" Y="6" Width="300" Height="15" Transparent="yes" NoPrefix="yes"
+                 Text="{\WixUI_Font_Title}What to install" />
+        <Control Id="Description" Type="Text" X="25" Y="23" Width="300" Height="15" Transparent="yes" NoPrefix="yes"
+                 Text="Tick one or both." />
+        <Control Id="PluginBox" Type="CheckBox" X="25" Y="62" Width="320" Height="17" Property="INSTALL_PLUGIN"
+                 CheckBoxValue="1" Text="&amp;VST3 plugin   (Ableton Live and other DAWs)" />
+        <Control Id="PluginText" Type="Text" X="40" Y="80" Width="310" Height="14" NoPrefix="yes"
+                 Text="Into the standard VST3 folder: C:\Program Files\Common Files\VST3" />
+        <Control Id="AppBox" Type="CheckBox" X="25" Y="106" Width="320" Height="17" Property="INSTALL_APP"
+                 CheckBoxValue="1" Text="&amp;Standalone app   (reacts to whatever the PC plays)" />
+        <Control Id="AppText" Type="Text" X="40" Y="124" Width="310" Height="14" NoPrefix="yes"
+                 Text="Into C:\Program Files\Milk Pump, with a Start menu entry" />
+        <Control Id="Always" Type="Text" X="25" Y="160" Width="320" Height="56" NoPrefix="yes"
+                 Text="Always included: the presets (ours and BeatDrop's 574-preset light set), the settings and the README, in Documents\Milk Pump. BeatDrop's full pack of about 11,000 presets is the separate Milk Pump Presets installer." />
+        <Control Id="Back" Type="PushButton" X="180" Y="243" Width="56" Height="17" Text="!(loc.WixUIBack)" />
+        <Control Id="Next" Type="PushButton" X="236" Y="243" Width="56" Height="17" Default="yes" Text="!(loc.WixUINext)"
+                 DisableCondition="NOT INSTALL_PLUGIN AND NOT INSTALL_APP" EnableCondition="INSTALL_PLUGIN OR INSTALL_APP" />
+        <Control Id="Cancel" Type="PushButton" X="304" Y="243" Width="56" Height="17" Cancel="yes" Text="!(loc.WixUICancel)">
+          <Publish Event="SpawnDialog" Value="CancelDlg" />
+        </Control>
+      </Dialog>
+
+      <Publish Dialog="ExitDialog" Control="Finish" Event="EndDialog" Value="Return" Order="999" />
+
+      <Publish Dialog="WelcomeDlg" Control="Next" Event="NewDialog" Value="LicenseAgreementDlg" Condition="NOT Installed" />
+      <Publish Dialog="WelcomeDlg" Control="Next" Event="NewDialog" Value="VerifyReadyDlg" Condition="Installed AND PATCH" />
+
+      <Publish Dialog="LicenseAgreementDlg" Control="Back" Event="NewDialog" Value="WelcomeDlg" />
+      <Publish Dialog="LicenseAgreementDlg" Control="Next" Event="NewDialog" Value="ChooseDlg" Condition="LicenseAccepted = &quot;1&quot;" />
+
+      <!-- The boxes become the parts: added or left out. -->
+      <Publish Dialog="ChooseDlg" Control="Back" Event="NewDialog" Value="LicenseAgreementDlg" Condition="NOT Installed" />
+      <Publish Dialog="ChooseDlg" Control="Back" Event="NewDialog" Value="MaintenanceTypeDlg" Condition="Installed" />
+      <Publish Dialog="ChooseDlg" Control="Next" Event="AddLocal" Value="Plugin" Order="1" Condition="INSTALL_PLUGIN" />
+      <Publish Dialog="ChooseDlg" Control="Next" Event="Remove" Value="Plugin" Order="2" Condition="NOT INSTALL_PLUGIN" />
+      <Publish Dialog="ChooseDlg" Control="Next" Event="AddLocal" Value="App" Order="3" Condition="INSTALL_APP" />
+      <Publish Dialog="ChooseDlg" Control="Next" Event="Remove" Value="App" Order="4" Condition="NOT INSTALL_APP" />
+      <Publish Dialog="ChooseDlg" Control="Next" Event="NewDialog" Value="VerifyReadyDlg" Order="5" />
+
+      <Publish Dialog="VerifyReadyDlg" Control="Back" Event="NewDialog" Value="ChooseDlg" Order="1"
+               Condition="NOT Installed OR WixUI_InstallMode = &quot;Change&quot;" />
+      <Publish Dialog="VerifyReadyDlg" Control="Back" Event="NewDialog" Value="MaintenanceTypeDlg" Order="2"
+               Condition="Installed AND NOT PATCH AND WixUI_InstallMode &lt;&gt; &quot;Change&quot;" />
+      <Publish Dialog="VerifyReadyDlg" Control="Back" Event="NewDialog" Value="WelcomeDlg" Order="3" Condition="Installed AND PATCH" />
+
+      <Publish Dialog="MaintenanceWelcomeDlg" Control="Next" Event="NewDialog" Value="MaintenanceTypeDlg" />
+      <Publish Dialog="MaintenanceTypeDlg" Control="ChangeButton" Event="NewDialog" Value="ChooseDlg" />
+      <Publish Dialog="MaintenanceTypeDlg" Control="RepairButton" Event="NewDialog" Value="VerifyReadyDlg" />
+      <Publish Dialog="MaintenanceTypeDlg" Control="RemoveButton" Event="NewDialog" Value="VerifyReadyDlg" />
+      <Publish Dialog="MaintenanceTypeDlg" Control="Back" Event="NewDialog" Value="MaintenanceWelcomeDlg" />
+    </UI>
+
+    <UIRef Id="WixUI_Common" />
+  </Fragment>
+</Wix>
