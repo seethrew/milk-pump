@@ -101,7 +101,7 @@ try {
     if (-not $SkipPresets) {
         $presets = Join-Path $PSScriptRoot 'Milk Pump Presets.msi'
         Write-Host 'Building the presets installer (a few minutes)...'
-        & $wix build MilkPumpPresets.wxs @common -d 'Version=1.0.1' -d "DataDir=$dataPresets" -o $presets
+        & $wix build MilkPumpPresets.wxs @common -d 'Version=1.0.2' -d "DataDir=$dataPresets" -o $presets
         if ($LASTEXITCODE) { throw 'wix build failed (Presets)' }
         Write-Host ("{0}  ({1:N0} MB)" -f $presets, ((Get-Item $presets).Length / 1MB))
     }
