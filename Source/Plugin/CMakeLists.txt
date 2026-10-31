@@ -4,7 +4,7 @@
 
 juce_add_plugin(MDVST_Plugin
     PRODUCT_NAME "Milk Pump"
-    VERSION 0.3.21 # 0.<phase>.<n>
+    VERSION 0.3.22 # 0.<phase>.<n>
     COMPANY_NAME "seethrew" # what DAWs list as the maker; the codes below are what they identify it by
     BUNDLE_ID com.daxy.milkpump
     PLUGIN_MANUFACTURER_CODE Daxy

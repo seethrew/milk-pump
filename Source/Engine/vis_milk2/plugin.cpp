@@ -4318,6 +4318,13 @@ bool CPlugin::LoadShaderFromMemory( const char* szOrigShaderText, char* szFn, ch
                                                  &pShaderByteCode, &m_pShaderCompileErrors, ppConstTable, &crashed);
             dumpmsg(crashed ? L"MDVST: shader compiler crashed twice; the shader is skipped"
                             : L"MDVST: legacy shader compiler crashed; compiled with d3dx9_43 instead");
+            // MDVST: said on screen too (OfficialIncubo's suggestion, issue #1); the crashed-twice case
+            // gets the usual compile error below.
+            if (!crashed && SUCCEEDED(hresult))
+            {
+                wchar_t note[] = L"Shader compiler crashed: compiled with the newer one instead";
+                AddNotif(note);
+            }
         }
 
         if (D3D_OK != hresult)
@@ -4376,8 +4383,14 @@ bool CPlugin::LoadShaderFromMemory( const char* szOrigShaderText, char* szFn, ch
             SafeRelease(pShaderByteCode);
             if (*ppConstTable) { (*ppConstTable)->Release(); *ppConstTable = NULL; }
             *ppShader = nullptr;
-            HRESULT compileResult = D3DXCompileShader(szShaderText, len, NULL, NULL, szFn, szProfile,
-                m_dwShaderFlags, &pShaderByteCode, &m_pShaderCompileErrors, ppConstTable);
+            // MDVST: guarded here too, with the same d3dx9_43 retry as the first compile.
+            bool recompileCrashed = false;
+            HRESULT compileResult = MDVST_CompileShaderGuarded(szShaderText, len, szFn, szProfile, m_dwShaderFlags,
+                &pShaderByteCode, &m_pShaderCompileErrors, ppConstTable, &recompileCrashed);
+            if (recompileCrashed && (m_dwShaderFlags & D3DXSHADER_USE_LEGACY_D3DX9_31_DLL))
+                compileResult = MDVST_CompileShaderGuarded(szShaderText, len, szFn, szProfile,
+                    m_dwShaderFlags & ~D3DXSHADER_USE_LEGACY_D3DX9_31_DLL,
+                    &pShaderByteCode, &m_pShaderCompileErrors, ppConstTable, &recompileCrashed);
             if (D3D_OK == compileResult) {
                 hr = 1;
                 if (szProfile[0] == 'v')
@@ -7706,6 +7719,13 @@ LRESULT CPlugin::MyWindowProc(HWND hWnd, unsigned uMsg, WPARAM wParam, LPARAM lP
 
         case 'D':
             if (GetKeyState(VK_CONTROL) & 0x8000) {
+                // MDVST: only the app has a capture of its own to switch (issue #1: in the plugin
+                // the message said "Microphone" and nothing changed).
+                if (!MDVST_Engine_MicAvailable()) {
+                    wchar_t note[] = L"The plugin listens to its track: no microphone switch here";
+                    AddNotif(note);
+                    break;
+                }
                 // CTRL+D pressed → toggle capture device
                 m_bCaptureMic = !m_bCaptureMic;
                 DetectSampleRate();

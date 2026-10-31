@@ -2300,6 +2300,26 @@ void MDVST_Engine_SetIntroFirst(bool introFirst)
     mdvstIntroFirst.store(introFirst);
 }
 
+// The microphone switch (mdvst_engine.h): only the app has a capture of its own to switch.
+static std::atomic<bool> mdvstMicAvailable { false };
+
+void MDVST_Engine_SetMicAvailable(bool available)
+{
+    mdvstMicAvailable.store(available);
+}
+
+bool MDVST_Engine_MicAvailable()
+{
+    return mdvstMicAvailable.load();
+}
+
+bool GetCaptureMicFlag(); // plugin.cpp
+
+bool MDVST_Engine_CaptureMic()
+{
+    return mdvstMicAvailable.load() && GetCaptureMicFlag();
+}
+
 // Render thread, every frame while the opening screen plays before the saved preset: at normal
 // speed (MDVST_Engine_Speed), no automatic switch, for one pour (8 s), then the saved preset blends
 // in with its lock. A preset the user picks meanwhile wins.

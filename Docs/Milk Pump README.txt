@@ -105,6 +105,7 @@
      F4, F5 .............. preset name, frames per second
      CTRL+X .............. screenshot (Documents\Milk Pump\screenshots)
      W ................... webcam into the visuals (cycles modes)
+     CTRL+D .............. the app: microphone / line in instead of the PC
      CTRL+Z .............. Spout output on / off (visuals to video software)
      ESC ................. leave full screen, close a menu
 

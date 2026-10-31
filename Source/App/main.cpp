@@ -79,6 +79,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, PSTR cmdLine, int)
     MDVST_Engine_SetMaxFps(settings.hq ? 60 : 30);
     MDVST_Engine_SetStartPreset(settings.preset.c_str(), settings.locked);
     MDVST_Engine_SetIntroFirst(true); // the Milk Pump opening screen, then the last preset
+    MDVST_Engine_SetMicAvailable(true); // CTRL+D: the microphone instead of what the PC plays
 
     if (!MDVST_Engine_Start(hInstance)) // no host window: a window of its own
     {

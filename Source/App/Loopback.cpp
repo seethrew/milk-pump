@@ -23,11 +23,11 @@ namespace
         return duration_cast<milliseconds>(steady_clock::now().time_since_epoch()).count();
     }
 
-    std::wstring defaultDeviceId(IMMDeviceEnumerator* e)
+    std::wstring defaultDeviceId(IMMDeviceEnumerator* e, EDataFlow flow)
     {
         std::wstring id;
         IMMDevice* d = nullptr;
-        if (SUCCEEDED(e->GetDefaultAudioEndpoint(eRender, eConsole, &d)))
+        if (SUCCEEDED(e->GetDefaultAudioEndpoint(flow, eConsole, &d)))
         {
             LPWSTR s = nullptr;
             if (SUCCEEDED(d->GetId(&s)))
@@ -73,6 +73,10 @@ bool Loopback::capture()
     IAudioCaptureClient* cap = nullptr;
     WAVEFORMATEX* fmt = nullptr;
     bool keepGoing = true;
+    // CTRL+D in the window: the default recording device (a microphone, a line in) instead of
+    // what the PC plays. Read once per session; a change ends the session and reopens.
+    const bool mic = MDVST_Engine_CaptureMic();
+    const EDataFlow flow = mic ? eCapture : eRender;
 
     auto cleanup = [&]
     {
@@ -85,16 +89,24 @@ bool Loopback::capture()
     };
 
     if (FAILED(CoCreateInstance(__uuidof(MMDeviceEnumerator), nullptr, CLSCTX_ALL, __uuidof(IMMDeviceEnumerator), (void**)&enumerator))
-        || FAILED(enumerator->GetDefaultAudioEndpoint(eRender, eConsole, &device))
+        || FAILED(enumerator->GetDefaultAudioEndpoint(flow, eConsole, &device))
         || FAILED(device->Activate(__uuidof(IAudioClient), CLSCTX_ALL, nullptr, (void**)&client))
         || FAILED(client->GetMixFormat(&fmt))
-        || FAILED(client->Initialize(AUDCLNT_SHAREMODE_SHARED, AUDCLNT_STREAMFLAGS_LOOPBACK, 2000000 /* 200 ms */, 0, fmt, nullptr))
+        || FAILED(client->Initialize(AUDCLNT_SHAREMODE_SHARED, mic ? 0 : AUDCLNT_STREAMFLAGS_LOOPBACK, 2000000 /* 200 ms */, 0, fmt, nullptr))
         || FAILED(client->GetService(__uuidof(IAudioCaptureClient), (void**)&cap))
         || FAILED(client->Start()))
     {
         cleanup();
+        // No microphone, or Windows' privacy settings keep it from desktop apps: say so once
+        // per switch, then keep retrying quietly (it may be plugged in or allowed later).
+        if (mic && !micFailShown)
+        {
+            micFailShown = true;
+            MDVST_Engine_ShowMessage(L"No microphone: check one is plugged in and Windows lets apps use it");
+        }
         return true; // no device yet (or none at all): retry
     }
+    micFailShown = false;
 
     // The mix format: float (usual) or integer PCM, any channel count; we take the first two.
     bool isFloat = fmt->wFormatTag == WAVE_FORMAT_IEEE_FLOAT;
@@ -104,16 +116,18 @@ bool Loopback::capture()
     const int rate = (int)fmt->nSamplesPerSec;
     std::vector<float> L, R;
 
-    const std::wstring id = defaultDeviceId(enumerator);
+    const std::wstring id = defaultDeviceId(enumerator, flow);
     long long lastDeviceCheck = nowMs();
 
     while (!stop)
     {
         Sleep(10);
-        if (nowMs() - lastDeviceCheck > 1000) // Windows switched the default output: follow it
+        if (MDVST_Engine_CaptureMic() != mic) // CTRL+D: reopen on the other side
+            break;
+        if (nowMs() - lastDeviceCheck > 1000) // Windows switched the default device: follow it
         {
             lastDeviceCheck = nowMs();
-            if (defaultDeviceId(enumerator) != id)
+            if (defaultDeviceId(enumerator, flow) != id)
                 break;
         }
         UINT32 packet = 0;

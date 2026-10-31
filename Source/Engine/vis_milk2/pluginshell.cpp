@@ -599,8 +599,9 @@ static void ShowTrayContextMenu(const ContextMenuRequest& request)
 	AppendMenuW(menu, MF_STRING, TRAY_MENU_RESET_TIME, L"Reset time variable");
 	AppendMenuW(menu, MF_STRING | (g_plugin.m_bFreezeBeatDetection ? MF_CHECKED : MF_UNCHECKED),
 		TRAY_MENU_FREEZE_BEAT, L"Freeze beat detection");
-	AppendMenuW(menu, MF_STRING, TRAY_MENU_AUDIO_DEVICE,
-		g_plugin.m_bCaptureMic ? L"Switch to speaker device" : L"Switch to microphone device");
+	if (MDVST_Engine_MicAvailable()) // MDVST: the app only; the plugin hears its track
+		AppendMenuW(menu, MF_STRING, TRAY_MENU_AUDIO_DEVICE,
+			g_plugin.m_bCaptureMic ? L"Switch to speaker device" : L"Switch to microphone device");
 	AppendMenuW(menu, MF_STRING, TRAY_MENU_SCREENSHOT, L"Save screenshot");
 	AppendMenuW(menu, MF_SEPARATOR, 0, NULL);
 	AppendMenuW(menu, MF_STRING, TRAY_MENU_PLAY, L"Play");
@@ -777,10 +778,14 @@ static void ExecuteTrayMenuCommand(HWND hwnd, UINT command, LPARAM value)
 		g_plugin.ResetTimeVariable();
 	else if (command == TRAY_MENU_FREEZE_BEAT)
 		g_plugin.ToggleBeatDetectionFreeze(false);
-	else if (command == TRAY_MENU_AUDIO_DEVICE)
+	else if (command == TRAY_MENU_AUDIO_DEVICE && MDVST_Engine_MicAvailable()) // MDVST: the app only
 	{
 		g_plugin.m_bCaptureMic = !g_plugin.m_bCaptureMic;
 		DetectSampleRate();
+		// MDVST: the same message as CTRL+D (upstream's menu switched silently)
+		wchar_t note[] = L"Switched to output audio device (Speaker)";
+		wchar_t noteMic[] = L"Switched to input audio device (Microphone)";
+		g_plugin.AddNotif(g_plugin.m_bCaptureMic ? noteMic : note);
 	}
 	else if (command == TRAY_MENU_SCREENSHOT)
 		g_plugin.CaptureScreenshot();
