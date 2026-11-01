@@ -112,6 +112,11 @@
                            icon to bring it back). In a DAW: close the window
      Z X C V ............. the app: previous / play-pause / stop / next, for
                            the music player Windows is running
+     F12 ................. transparency: black turns see-through, and clicks
+                           on the see-through parts go to whatever is behind
+                           (your DAW). Click a lit part to bring Milk Pump
+                           back to the front
+     SHIFT+UP / DOWN ..... fade the whole window (clicks stay on Milk Pump)
      RIGHT-CLICK ......... the menu. "Open on the Milk Pump banner" or "Open
                            on this preset instead": what a NEW Milk Pump (or
                            the app's first start) opens on, held for 8 s
