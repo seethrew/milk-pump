@@ -52,11 +52,13 @@ bool MDVST_Engine_TakeStartPreset(wchar_t* path, int maxChars, bool* locked);
 // start preset blends in. The plugin restores a set's preset straight away.
 void MDVST_Engine_SetIntroFirst(bool introFirst);
 
-// The app (before Start): it can listen to the microphone, so CTRL+D and the menu switch between
-// the playback device and the default recording device. The plugin hears its track only: there
-// the switch just says so. MDVST_Engine_CaptureMic is the switch's state, for the capture thread.
-void MDVST_Engine_SetMicAvailable(bool available);
-bool MDVST_Engine_MicAvailable();
+// The app (before Start): the visuals in a window of their own, with a capture of its own. So
+// CTRL+D and the menu switch between the playback device and the default recording device, and
+// CTRL+W and the window-mode menu items (hide to the tray, borderless, always on top...) apply.
+// In the plugin they do not: it hears its track, and its window is the DAW's to manage.
+// MDVST_Engine_CaptureMic is the microphone switch's state, for the capture thread.
+void MDVST_Engine_SetIsApp(bool isApp);
+bool MDVST_Engine_IsApp();
 bool MDVST_Engine_CaptureMic();
 
 // False once the window has been closed, by Stop() or by the user.

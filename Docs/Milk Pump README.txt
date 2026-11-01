@@ -106,7 +106,15 @@
      CTRL+X .............. screenshot (Documents\Milk Pump\screenshots)
      W ................... webcam into the visuals (cycles modes)
      CTRL+D .............. the app: microphone / line in instead of the PC
-     CTRL+Z .............. Spout output on / off (visuals to video software)
+     CTRL+Z .............. Spout output on / off (visuals to video software,
+                           sender name "Milk Pump")
+     CTRL+W .............. the app: hide to the tray, by the clock (click the
+                           icon to bring it back). In a DAW: close the window
+     Z X C V ............. the app: previous / play-pause / stop / next, for
+                           the music player Windows is running
+     RIGHT-CLICK ......... the menu. "Open on the Milk Pump banner" or "Open
+                           on this preset instead": what a NEW Milk Pump (or
+                           the app's first start) opens on, held for 8 s
      ESC ................. leave full screen, close a menu
 
   ============================================================================

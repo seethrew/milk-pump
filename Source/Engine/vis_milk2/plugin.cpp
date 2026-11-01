@@ -648,6 +648,7 @@ SPOUT :
 #ifdef MDVST_PLUGIN
 #include "../mdvst_engine.h" // MDVST: MDVST_Engine_TakeStartPreset (the preset saved with the set)
 bool MDVST_OpeningScreenHolds(); // MDVST: Milkdrop2PcmVisualizer.cpp, the opening screen's hold
+void MDVST_MediaKey(BYTE vk);    // MDVST: below, media keys from the app only
 #endif
 #pragma comment(lib, "dwmapi.lib")
 
@@ -1139,7 +1140,7 @@ void CPlugin::MyPreInitialize()
 	// EnableSpoutLog(); // Shows Spout logs on the console
     // OpenSpoutConsole(); // Empty console
 
-	sprintf(WinampSenderName, "BeatDrop");
+	sprintf(WinampSenderName, MDVST_WINDOW_TITLE_A); // MDVST: "Milk Pump" in OBS etc. (was "BeatDrop")
 	bInitialized = false;
 	bSpoutOut = true; // User on/off toggle
 	bSpoutChanged = false; // set to write config on exit
@@ -6670,12 +6671,19 @@ LRESULT CPlugin::MyWindowProc(HWND hWnd, unsigned uMsg, WPARAM wParam, LPARAM lP
 
         if (bCtrlHeldDown && (wParam == 'L' || wParam == 'l'))
         {
+#ifdef MDVST_PLUGIN // MDVST: lyrics need now-playing (SMTC) and LRCLIB, both compiled out
+            wchar_t note[] = L"Lyrics are not part of Milk Pump";
+            AddNotif(note);
+#else
             ToggleLyrics();
+#endif
             return 0;
         }
         if (bCtrlHeldDown && bShiftHeldDown && (wParam == 'E' || wParam == 'e'))
         {
+#ifndef MDVST_PLUGIN // MDVST: (as above)
             OpenLyricsEditor(hWnd);
+#endif
             return 0;
         }
 
@@ -6791,6 +6799,12 @@ LRESULT CPlugin::MyWindowProc(HWND hWnd, unsigned uMsg, WPARAM wParam, LPARAM lP
             #endif
             return 0; // we processed (or absorbed) the key
         case VK_F12:
+            if (!MDVST_Engine_IsApp()) // MDVST: (as for window opacity) the app only
+            {
+                wchar_t note[] = L"Transparency mode is the app's";
+                AddNotif(note);
+                return 0;
+            }
             if (!m_bDesktopMode) // Prevent transparency mode on desktop mode.
             {
                 g_plugin.TranspaMode = !g_plugin.TranspaMode;
@@ -7476,6 +7490,12 @@ LRESULT CPlugin::MyWindowProc(HWND hWnd, unsigned uMsg, WPARAM wParam, LPARAM lP
 			}
             else if (bShiftHeldDown)
             {
+                if (!MDVST_Engine_IsApp()) // MDVST: see-through windows are the app's; in a DAW the window is the host's
+                {
+                    wchar_t note[] = L"Window opacity is the app's";
+                    AddNotif(note);
+                    return 0;
+                }
                 if (g_plugin.OpacityControl < 100)
                     ++g_plugin.OpacityControl;
 #if 0
@@ -7584,6 +7604,12 @@ LRESULT CPlugin::MyWindowProc(HWND hWnd, unsigned uMsg, WPARAM wParam, LPARAM lP
 			}
             else if (bShiftHeldDown)
             {
+                if (!MDVST_Engine_IsApp()) // MDVST: see-through windows are the app's; in a DAW the window is the host's
+                {
+                    wchar_t note[] = L"Window opacity is the app's";
+                    AddNotif(note);
+                    return 0;
+                }
                 if (g_plugin.OpacityControl > 5)
                     --g_plugin.OpacityControl;
 #if 0
@@ -7687,8 +7713,7 @@ LRESULT CPlugin::MyWindowProc(HWND hWnd, unsigned uMsg, WPARAM wParam, LPARAM lP
                     }
                     return 0;
                 }
-                keybd_event(VK_MEDIA_PLAY_PAUSE, 0, 0, 0);
-                keybd_event(VK_MEDIA_PLAY_PAUSE, 0, KEYEVENTF_KEYUP, 0);
+                MDVST_MediaKey(VK_MEDIA_PLAY_PAUSE); // MDVST: the app only (was keybd_event down/up)
                 /*
                 SendNotifyMessage(HWND_BROADCAST, WM_APPCOMMAND, 0, MAKELPARAM(0, APPCOMMAND_MEDIA_PLAY_PAUSE));
                 Sleep(200);
@@ -7699,8 +7724,7 @@ LRESULT CPlugin::MyWindowProc(HWND hWnd, unsigned uMsg, WPARAM wParam, LPARAM lP
         case 'C':
             if (m_UI_mode == UI_REGULAR)
             {
-                keybd_event(VK_MEDIA_STOP, 0, 0, 0);
-                keybd_event(VK_MEDIA_STOP, 0, KEYEVENTF_KEYUP, 0);
+                MDVST_MediaKey(VK_MEDIA_STOP); // MDVST: the app only (was keybd_event down/up)
                 /*
                 SendNotifyMessage(HWND_BROADCAST, WM_APPCOMMAND, 0, MAKELPARAM(0, APPCOMMAND_MEDIA_STOP));
                 Sleep(200);
@@ -7710,8 +7734,7 @@ LRESULT CPlugin::MyWindowProc(HWND hWnd, unsigned uMsg, WPARAM wParam, LPARAM lP
         case 'V':
             if (m_UI_mode == UI_REGULAR)
             {
-                keybd_event(VK_MEDIA_NEXT_TRACK, 0, 0, 0);
-                keybd_event(VK_MEDIA_NEXT_TRACK, 0, KEYEVENTF_KEYUP, 0);
+                MDVST_MediaKey(VK_MEDIA_NEXT_TRACK); // MDVST: the app only (was keybd_event down/up)
                 /*
                 SendNotifyMessage(HWND_BROADCAST, WM_APPCOMMAND, 0, MAKELPARAM(0, APPCOMMAND_MEDIA_NEXTTRACK));
                 Sleep(200);
@@ -7723,7 +7746,7 @@ LRESULT CPlugin::MyWindowProc(HWND hWnd, unsigned uMsg, WPARAM wParam, LPARAM lP
             if (GetKeyState(VK_CONTROL) & 0x8000) {
                 // MDVST: only the app has a capture of its own to switch (issue #1: in the plugin
                 // the message said "Microphone" and nothing changed).
-                if (!MDVST_Engine_MicAvailable()) {
+                if (!MDVST_Engine_IsApp()) {
                     wchar_t note[] = L"The plugin listens to its track: no microphone switch here";
                     AddNotif(note);
                     break;
@@ -7982,8 +8005,7 @@ LRESULT CPlugin::MyWindowProc(HWND hWnd, unsigned uMsg, WPARAM wParam, LPARAM lP
 			}
             else if (m_UI_mode == UI_REGULAR)
             {
-                keybd_event(VK_MEDIA_PREV_TRACK, 0, 0, 0);
-                keybd_event(VK_MEDIA_PREV_TRACK, 0, KEYEVENTF_KEYUP, 0);
+                MDVST_MediaKey(VK_MEDIA_PREV_TRACK); // MDVST: the app only (was keybd_event down/up)
             }
 		break;
 
@@ -12588,6 +12610,54 @@ void CPlugin::ShowMissingDirectXMessage()
         // open website in browser
         ShellExecuteA(NULL, "open", "https://www.microsoft.com/en-us/download/details.aspx?id=35", NULL, NULL, SW_SHOWNORMAL);
     }
+}
+
+// MDVST: Winamp's media keys (X play/pause, C stop, V next, Z previous) drive whatever player
+// Windows has: right for the app beside YouTube or Spotify, wrong inside a DAW, where the same
+// keys would pause music playing elsewhere. The plugin says so instead.
+void MDVST_MediaKey(BYTE vk)
+{
+    if (!MDVST_Engine_IsApp())
+    {
+        wchar_t note[] = L"Media keys (Z X C V) are the app's";
+        g_plugin.AddNotif(note);
+        return;
+    }
+    keybd_event(vk, 0, 0, 0);
+    keybd_event(vk, 0, KEYEVENTF_KEYUP, 0);
+}
+
+// MDVST: what a fresh start opens on (the right-click menu): the Milk Pump banner, or a preset of
+// the user's. It is upstream's start-up preset (szPresetStartup, bEnablePresetStartup), now also
+// written back, relative to the data folder when it is in there. Render thread (menu commands).
+static const wchar_t kMdvstBanner[] = L"startuppreset\Milk Pump Startup.milk";
+
+bool MDVST_StartPresetIsBanner()
+{
+    wchar_t banner[MAX_PATH];
+    swprintf_s(banner, L"%s%s", MDVST_DataDirectory(), kMdvstBanner);
+    return lstrcmpiW(g_plugin.m_szPresetStartup, banner) == 0;
+}
+
+bool MDVST_SetStartPreset(const wchar_t* path) // null = the banner
+{
+    wchar_t full[MAX_PATH];
+    if (path == nullptr)
+        swprintf_s(full, L"%s%s", MDVST_DataDirectory(), kMdvstBanner);
+    else if (path[0])
+        lstrcpynW(full, path, MAX_PATH);
+    else
+        return false;
+    if (GetFileAttributesW(full) == INVALID_FILE_ATTRIBUTES)
+        return false;
+    lstrcpyW(g_plugin.m_szPresetStartup, full);
+    g_plugin.m_bEnablePresetStartup = true;
+    const wchar_t* data = MDVST_DataDirectory();
+    const size_t n = wcslen(data);
+    const wchar_t* saved = (n && _wcsnicmp(full, data, n) == 0) ? full + n : full;
+    WritePrivateProfileStringW(L"settings", L"szPresetStartup", saved, g_plugin.GetConfigIniFile());
+    WritePrivateProfileIntW(1, L"bEnablePresetStartup", g_plugin.GetConfigIniFile(), L"settings");
+    return true;
 }
 
 // Audio capture remains owned by the plugin settings; the audio module calls

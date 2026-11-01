@@ -206,10 +206,19 @@ void UpdateTrayIconForHiddenWindow();
 void UpdateTrayIconForShownWindow();
 void UpdateTrayIconForDesktopMode();
 
+bool MDVST_StartPresetIsBanner();                  // MDVST: plugin.cpp, what a fresh start opens on
+bool MDVST_SetStartPreset(const wchar_t* path);    // (null = the banner)
+
 static void HandleCtrlW(HWND hwnd)
 {
 	if (g_plugin.m_bDesktopMode)
 		return;
+	if (!MDVST_Engine_IsApp()) // MDVST: hiding to the tray is the app's; a DAW opens and closes the window
+	{
+		wchar_t note[] = L"In a DAW, close the plugin window to hide the visuals";
+		g_plugin.AddNotif(note);
+		return;
+	}
 
 	if (!IsWindowVisible(hwnd))
 	{
@@ -314,6 +323,8 @@ enum TrayMenuCommand
 	TRAY_MENU_ALWAYS_ON_TOP,
 	TRAY_MENU_TRANSPARENCY,
 	TRAY_MENU_EXIT,
+	TRAY_MENU_START_THIS,   // MDVST: what a fresh start opens on (MDVST_SetStartPreset)
+	TRAY_MENU_START_BANNER,
 	TRAY_MENU_AUDIO_SENSITIVITY_BASE = 2100,
 	TRAY_MENU_FPS_BASE = 2200,
 	TRAY_MENU_TRANSITION_BASE = 2600,
@@ -473,10 +484,11 @@ static void ShowTrayContextMenu(const ContextMenuRequest& request)
 	{
 		AppendMenuW(menu, MF_STRING | (fullscreen ? MF_CHECKED : MF_UNCHECKED),
 			TRAY_MENU_FULLSCREEN, L"Full-screen mode");
-		AppendMenuW(menu, MF_STRING | (stretch ? MF_CHECKED : MF_UNCHECKED),
-			TRAY_MENU_MONITOR_STRETCH, L"Monitor stretch mode");
+		if (MDVST_Engine_IsApp()) // MDVST: the window modes are the app's; the plugin's window is the DAW's
+			AppendMenuW(menu, MF_STRING | (stretch ? MF_CHECKED : MF_UNCHECKED),
+				TRAY_MENU_MONITOR_STRETCH, L"Monitor stretch mode");
 	}
-	if (visualWindowMenu)
+	if (visualWindowMenu && MDVST_Engine_IsApp()) // MDVST: (as above)
 	{
 		UINT borderlessFlags = MF_STRING | (borderless ? MF_CHECKED : MF_UNCHECKED);
 		if (fullscreen || stretch || desktopMode)
@@ -529,10 +541,12 @@ static void ShowTrayContextMenu(const ContextMenuRequest& request)
     AppendMenuW(menu, MF_STRING, TRAY_MENU_WEBCAM_OPACITIES, L"Webcam mode opacities...");
     AppendMenuW(menu, MF_SEPARATOR, 0, nullptr);
 
+#ifndef MDVST_PLUGIN // MDVST: lyrics need the song from Windows' now-playing and LRCLIB, both compiled out
 	AppendMenuW(menu, MF_STRING | (g_plugin.m_bEnableLyrics ? MF_CHECKED : MF_UNCHECKED),
 		TRAY_MENU_ENABLE_LYRICS, L"Enable lyrics");
 	AppendMenuW(menu, MF_STRING, TRAY_MENU_OPEN_LYRICS_EDITOR,
 		L"Open lyrics editor");
+#endif
 	AppendMenuW(menu, MF_STRING | (g_plugin.bSpoutOut ? MF_CHECKED : MF_UNCHECKED),
 		TRAY_MENU_SPOUT, L"Spout output");
 
@@ -588,6 +602,16 @@ static void ShowTrayContextMenu(const ContextMenuRequest& request)
 
 	AppendMenuW(menu, MF_STRING | (g_plugin.m_bPresetLockedByUser ? MF_CHECKED : MF_UNCHECKED),
 		TRAY_MENU_LOCK_PRESET, L"Lock current preset");
+	{
+		// MDVST: what a new plugin (or the app's first run) opens on: the banner, or a preset of
+		// the user's. Saved in the data folder's beatdrop.ini, so the plugin and the app share it.
+		const bool onBanner = MDVST_StartPresetIsBanner();
+		AppendMenuW(menu, MF_STRING | (onBanner ? MF_CHECKED : MF_UNCHECKED),
+			TRAY_MENU_START_BANNER, L"Open on the Milk Pump banner");
+		AppendMenuW(menu, MF_STRING | (onBanner ? MF_UNCHECKED : MF_CHECKED),
+			TRAY_MENU_START_THIS, onBanner ? L"Open on this preset instead"
+			                               : L"Open on a preset of mine (set to this one)");
+	}
 	AppendMenuW(menu, MF_STRING | (g_plugin.m_bAutoLockPresetWhenNoMusic ? MF_CHECKED : MF_UNCHECKED),
 		TRAY_MENU_AUTO_LOCK_SILENCE, L"Auto lock preset when no music/silence");
 	AppendMenuW(menu, MF_STRING | (!g_plugin.m_bSequentialPresetOrder ? MF_CHECKED : MF_UNCHECKED),
@@ -599,10 +623,12 @@ static void ShowTrayContextMenu(const ContextMenuRequest& request)
 	AppendMenuW(menu, MF_STRING, TRAY_MENU_RESET_TIME, L"Reset time variable");
 	AppendMenuW(menu, MF_STRING | (g_plugin.m_bFreezeBeatDetection ? MF_CHECKED : MF_UNCHECKED),
 		TRAY_MENU_FREEZE_BEAT, L"Freeze beat detection");
-	if (MDVST_Engine_MicAvailable()) // MDVST: the app only; the plugin hears its track
+	if (MDVST_Engine_IsApp()) // MDVST: the app only; the plugin hears its track
 		AppendMenuW(menu, MF_STRING, TRAY_MENU_AUDIO_DEVICE,
 			g_plugin.m_bCaptureMic ? L"Switch to speaker device" : L"Switch to microphone device");
 	AppendMenuW(menu, MF_STRING, TRAY_MENU_SCREENSHOT, L"Save screenshot");
+	if (MDVST_Engine_IsApp()) // MDVST: media keys and Exit are the app's; in a DAW they'd reach other players
+	{
 	AppendMenuW(menu, MF_SEPARATOR, 0, NULL);
 	AppendMenuW(menu, MF_STRING, TRAY_MENU_PLAY, L"Play");
 	AppendMenuW(menu, MF_STRING, TRAY_MENU_PAUSE, L"Pause");
@@ -613,6 +639,7 @@ static void ShowTrayContextMenu(const ContextMenuRequest& request)
 	AppendMenuW(menu, MF_STRING, TRAY_MENU_SEEK_RIGHT, L"Seek right");
 	AppendMenuW(menu, MF_SEPARATOR, 0, NULL);
 	AppendMenuW(menu, MF_STRING, TRAY_MENU_EXIT, L"Exit");
+	}
 
 	POINT point;
 	GetCursorPos(&point);
@@ -778,7 +805,7 @@ static void ExecuteTrayMenuCommand(HWND hwnd, UINT command, LPARAM value)
 		g_plugin.ResetTimeVariable();
 	else if (command == TRAY_MENU_FREEZE_BEAT)
 		g_plugin.ToggleBeatDetectionFreeze(false);
-	else if (command == TRAY_MENU_AUDIO_DEVICE && MDVST_Engine_MicAvailable()) // MDVST: the app only
+	else if (command == TRAY_MENU_AUDIO_DEVICE && MDVST_Engine_IsApp()) // MDVST: the app only
 	{
 		g_plugin.m_bCaptureMic = !g_plugin.m_bCaptureMic;
 		DetectSampleRate();
@@ -786,6 +813,19 @@ static void ExecuteTrayMenuCommand(HWND hwnd, UINT command, LPARAM value)
 		wchar_t note[] = L"Switched to output audio device (Speaker)";
 		wchar_t noteMic[] = L"Switched to input audio device (Microphone)";
 		g_plugin.AddNotif(g_plugin.m_bCaptureMic ? noteMic : note);
+	}
+	else if (command == TRAY_MENU_START_BANNER || command == TRAY_MENU_START_THIS) // MDVST
+	{
+		wchar_t note[MAX_PATH + 64];
+		if (MDVST_SetStartPreset(command == TRAY_MENU_START_BANNER ? nullptr : g_plugin.m_szCurrentPresetFile))
+		{
+			const wchar_t* name = wcsrchr(g_plugin.m_szPresetStartup, L'\\');
+			swprintf_s(note, L"A new Milk Pump opens on: %s",
+				MDVST_StartPresetIsBanner() ? L"the banner" : (name ? name + 1 : g_plugin.m_szPresetStartup));
+		}
+		else
+			swprintf_s(note, L"No preset to open on");
+		g_plugin.AddNotif(note);
 	}
 	else if (command == TRAY_MENU_SCREENSHOT)
 		g_plugin.CaptureScreenshot();
