@@ -21,7 +21,8 @@
 
 ### Tip: transparency in a DAW
 
-**F12** makes black see-through, and clicks on the see-through parts go to your DAW behind.
+**F12** makes **pure black** see-through (near-black stays solid, so it works best with presets
+that have a true black background), and clicks on the see-through parts go to your DAW behind.
 Click a lit part to bring Milk Pump back to the front. **Shift+Up / Down** fades the whole window.
 
 ### Download
