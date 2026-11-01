@@ -6799,12 +6799,6 @@ LRESULT CPlugin::MyWindowProc(HWND hWnd, unsigned uMsg, WPARAM wParam, LPARAM lP
             #endif
             return 0; // we processed (or absorbed) the key
         case VK_F12:
-            if (!MDVST_Engine_IsApp()) // MDVST: (as for window opacity) the app only
-            {
-                wchar_t note[] = L"Transparency mode is the app's";
-                AddNotif(note);
-                return 0;
-            }
             if (!m_bDesktopMode) // Prevent transparency mode on desktop mode.
             {
                 g_plugin.TranspaMode = !g_plugin.TranspaMode;
@@ -7490,12 +7484,6 @@ LRESULT CPlugin::MyWindowProc(HWND hWnd, unsigned uMsg, WPARAM wParam, LPARAM lP
 			}
             else if (bShiftHeldDown)
             {
-                if (!MDVST_Engine_IsApp()) // MDVST: see-through windows are the app's; in a DAW the window is the host's
-                {
-                    wchar_t note[] = L"Window opacity is the app's";
-                    AddNotif(note);
-                    return 0;
-                }
                 if (g_plugin.OpacityControl < 100)
                     ++g_plugin.OpacityControl;
 #if 0
@@ -7604,12 +7592,6 @@ LRESULT CPlugin::MyWindowProc(HWND hWnd, unsigned uMsg, WPARAM wParam, LPARAM lP
 			}
             else if (bShiftHeldDown)
             {
-                if (!MDVST_Engine_IsApp()) // MDVST: see-through windows are the app's; in a DAW the window is the host's
-                {
-                    wchar_t note[] = L"Window opacity is the app's";
-                    AddNotif(note);
-                    return 0;
-                }
                 if (g_plugin.OpacityControl > 5)
                     --g_plugin.OpacityControl;
 #if 0

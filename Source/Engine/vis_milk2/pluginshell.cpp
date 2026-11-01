@@ -499,9 +499,10 @@ static void ShowTrayContextMenu(const ContextMenuRequest& request)
 			TRAY_MENU_DESKTOP_MODE, L"Desktop mode");
 		AppendMenuW(menu, MF_STRING | (g_plugin.m_bAlwaysOnTop ? MF_CHECKED : MF_UNCHECKED),
 			TRAY_MENU_ALWAYS_ON_TOP, L"Always on top");
+	}
+	if (visualWindowMenu) // MDVST: transparency in the plugin too (Daxy uses it there)
 		AppendMenuW(menu, MF_STRING | (g_plugin.TranspaMode ? MF_CHECKED : MF_UNCHECKED),
 			TRAY_MENU_TRANSPARENCY, L"Transparency mode");
-	}
 	AppendMenuW(menu, MF_SEPARATOR, 0, NULL);
     std::vector<BeatDropWebcam::Device> cameras;
     const HRESULT cameraStatus = BeatDropWebcam::ListDevices(cameras);
