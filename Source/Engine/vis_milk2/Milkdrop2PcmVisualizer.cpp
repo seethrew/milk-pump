@@ -2217,8 +2217,8 @@ static std::wstring MDVST_RelativeToData(const std::wstring& path)
 static void MDVST_PublishPreset()
 {
     static DWORD last = 0;
-    if (GetTickCount() - last < 250 || !mdvstAfterIntro.empty())
-        return; // (during the app's opening screen the saved preset still counts)
+    if (GetTickCount() - last < 250 || mdvstIntroPlaying.load())
+        return; // (during the opening screen the saved preset, or none, still counts)
     last = GetTickCount();
     std::wstring now = g_plugin.m_szCurrentPresetFile[0] ? MDVST_RelativeToData(g_plugin.m_szCurrentPresetFile) : std::wstring();
     std::lock_guard<std::mutex> lock(mdvstPresetMutex);
@@ -2244,11 +2244,31 @@ void MDVST_Engine_SetStartPreset(const wchar_t* path, bool locked)
     mdvstLockedStart = locked;
 }
 
+// MDVST: a fresh start with nothing saved (a new plugin, or the app's first run) opens on the
+// start-up preset, the Milk Pump banner: held for its 8 s like the app's opening screen, or the
+// first loud beat (hard cuts) or the auto-switch replaced it at once (Daxy, 2026-11-01).
+static void MDVST_HoldOpeningScreen()
+{
+    if (!g_plugin.m_bEnablePresetStartup
+        || GetFileAttributesW(g_plugin.m_szPresetStartup) == INVALID_FILE_ATTRIBUTES)
+        return;
+    mdvstAfterIntro.clear(); // nothing to blend into after: the usual preset changes carry on
+    mdvstIntroStarted = GetTickCount();
+    mdvstIntroPlaying.store(true);
+}
+
+// MDVST: render thread. True while the opening screen holds: no automatic preset change of any
+// kind (timed or hard cut; plugin.cpp counts it as a lock by code). The user's own keys still work.
+bool MDVST_OpeningScreenHolds()
+{
+    return mdvstIntroPlaying.load(std::memory_order_relaxed);
+}
+
 bool MDVST_Engine_TakeStartPreset(wchar_t* path, int maxChars, bool* locked)
 {
     std::lock_guard<std::mutex> lock(mdvstPresetMutex);
     if (mdvstPresetStart.empty() || maxChars <= 0)
-        return false;
+        return MDVST_HoldOpeningScreen(), false;
     std::wstring full = mdvstPresetStart;
     if (PathIsRelativeW(full.c_str()))
     {
@@ -2279,7 +2299,7 @@ bool MDVST_Engine_TakeStartPreset(wchar_t* path, int maxChars, bool* locked)
             full = moved;
     }
     if (GetFileAttributesW(full.c_str()) == INVALID_FILE_ATTRIBUTES)
-        return false; // moved or deleted: the usual start-up preset instead
+        return MDVST_HoldOpeningScreen(), false; // moved or deleted: the usual start-up preset instead
     if (mdvstIntroFirst.load() && g_plugin.m_bEnablePresetStartup
         && GetFileAttributesW(g_plugin.m_szPresetStartup) != INVALID_FILE_ATTRIBUTES
         && lstrcmpiW(full.c_str(), g_plugin.m_szPresetStartup) != 0)
@@ -2291,6 +2311,8 @@ bool MDVST_Engine_TakeStartPreset(wchar_t* path, int maxChars, bool* locked)
         mdvstIntroPlaying.store(true);
         return false;
     }
+    if (lstrcmpiW(full.c_str(), g_plugin.m_szPresetStartup) == 0)
+        MDVST_HoldOpeningScreen(); // a set saved on the banner: held too
     lstrcpynW(path, full.c_str(), maxChars);
     return true;
 }
@@ -2325,7 +2347,7 @@ bool MDVST_Engine_CaptureMic()
 // in with its lock. A preset the user picks meanwhile wins.
 static void MDVST_AfterIntro()
 {
-    if (mdvstAfterIntro.empty())
+    if (!mdvstIntroPlaying.load())
         return;
     if (lstrcmpiW(g_plugin.m_szCurrentPresetFile, g_plugin.m_szPresetStartup) != 0)
     {
@@ -2334,13 +2356,12 @@ static void MDVST_AfterIntro()
         return;
     }
     if (GetTickCount() - mdvstIntroStarted < 8000)
-    {
-        g_plugin.m_fNextPresetTime = g_plugin.GetTime() + 5.0f; // hold off the automatic switch
-        return;
-    }
+        return; // held: MDVST_OpeningScreenHolds stops the automatic switch and hard cuts
     const std::wstring next = mdvstAfterIntro;
     mdvstAfterIntro.clear();
     mdvstIntroPlaying.store(false);
+    if (next.empty())
+        return; // a fresh start: the usual preset changes from here
     g_plugin.LoadPreset(next.c_str(), 2.0f);
     g_plugin.m_bPresetLockedByUser = mdvstAfterIntroLocked;
 }

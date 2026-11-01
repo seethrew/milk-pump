@@ -647,6 +647,7 @@ SPOUT :
 #include <dwmapi.h>  // Link with Dwmapi.lib
 #ifdef MDVST_PLUGIN
 #include "../mdvst_engine.h" // MDVST: MDVST_Engine_TakeStartPreset (the preset saved with the set)
+bool MDVST_OpeningScreenHolds(); // MDVST: Milkdrop2PcmVisualizer.cpp, the opening screen's hold
 #endif
 #pragma comment(lib, "dwmapi.lib")
 
@@ -4643,7 +4644,8 @@ void CPlugin::MyRenderFn(int redraw)
     {
         float dt = GetTime() - m_prev_time;
         m_prev_time = GetTime(); // note: m_prev_time is not for general use!
-        m_bPresetLockedByCode = (m_UI_mode != UI_REGULAR);
+        m_bPresetLockedByCode = (m_UI_mode != UI_REGULAR)
+                             || MDVST_OpeningScreenHolds(); // MDVST: the banner holds its 8 s
         if (m_bPresetLockedByUser || m_bPresetLockedByCode)
         {
             // to freeze time (at current preset time value) when menus are up or Scroll Lock is on:
