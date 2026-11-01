@@ -344,10 +344,12 @@ int main(int argc, char** argv)
             runRealTime(*p, 48000.0, 1.5);
             w = renderWindows();
             check(w.size() == 1 && isFullScreen(w[0]), "double-click: full screen");
+            check(!IsWindowVisible(win.frame()), "full screen: the empty plugin window is hidden");
             if (w.size() == 1)
                 doubleClick(w[0]);
             runRealTime(*p, 48000.0, 1.5);
             check(insideAndFilling(win.frame()), "double-click again: back inside the plugin window");
+            check(IsWindowVisible(win.frame()) != FALSE, "and the plugin window is shown again");
         }
 
         {   // a second copy, its window open too

@@ -615,6 +615,38 @@ void DeinitD3d() {
 }
 
 #ifdef MDVST_PLUGIN
+// MDVST: full screen out of a plugin window that is a window of its own (Live's floating plugin
+// window): that window, now empty, is hidden until the visuals come back, so it never shows
+// through transparency mode (Daxy, 2026-11-01). Not when the DAW docks the editor in a bigger
+// window (its main window): hiding that would hide the DAW. Render thread only.
+static HWND mdvstHiddenHostTop = nullptr;
+
+static void MDVST_HideHostWindow(HWND editor)
+{
+    HWND top = editor ? GetAncestor(editor, GA_ROOT) : nullptr;
+    RECT e, t;
+    if (top == nullptr || top == editor || !IsWindowVisible(top)
+        || !GetWindowRect(editor, &e) || !GetWindowRect(top, &t))
+        return;
+    // A plugin window is the editor plus a title bar and frame; a DAW's main window is far bigger.
+    if ((t.right - t.left) > (e.right - e.left) + 120 || (t.bottom - t.top) > (e.bottom - e.top) + 200)
+        return;
+    ShowWindowAsync(top, SW_HIDE); // async: never wait on the host's UI thread
+    mdvstHiddenHostTop = top;
+}
+
+static void MDVST_ShowHostWindow()
+{
+    HWND top = mdvstHiddenHostTop;
+    mdvstHiddenHostTop = nullptr;
+    HWND host = mdvstHost.load();
+    // Only while the editor is still open: if the DAW closed it meanwhile, it stays the DAW's.
+    if (top != nullptr && IsWindow(top) && host != nullptr && IsWindow(host) && GetAncestor(host, GA_ROOT) == top)
+        ShowWindowAsync(top, SW_SHOWNA);
+}
+#endif
+
+#ifdef MDVST_PLUGIN
 // MDVST: leaving full screen / stretch when the window came out of the plugin's window: back in,
 // at the editor's size, or closed if the editor has gone.
 static void MDVST_LeaveFullScreenToHost(HWND hwnd)
@@ -631,6 +663,7 @@ static void MDVST_LeaveFullScreenToHost(HWND hwnd)
     g_plugin.PrepareForExternalDeviceReset();
     pD3DDevice->Reset(&d3dPp);
     g_plugin.RestoreAfterExternalDeviceReset();
+    MDVST_ShowHostWindow(); // the plugin's own window, hidden while full screen
     if (!MDVST_ReturnToHost(hwnd))
         MDVST_Park(hwnd); // no editor to go back into: wait, hidden, for the next one
     UpdateDisplayExecutionState();
@@ -671,7 +704,10 @@ void ToggleStretch(HWND hwnd) {
         SetWindowLongW(hwnd, GWL_EXSTYLE, WS_EX_APPWINDOW);
 #ifdef MDVST_PLUGIN
         if (wasEmbedded)
+        {
+            MDVST_HideHostWindow(mdvstHost.load()); // MDVST: its now-empty window too
             SetParent(hwnd, nullptr); // MDVST: out of the plugin's window
+        }
 #endif
         SetWindowPos(hwnd, HWND_NOTOPMOST, left, top, width, height, SWP_DRAWFRAME | SWP_FRAMECHANGED);
 		DragAcceptFiles(hwnd, TRUE);
@@ -750,7 +786,10 @@ void ToggleFullScreen(HWND hwnd) {
         SetWindowLongW(hwnd, GWL_EXSTYLE, WS_EX_APPWINDOW);
 #ifdef MDVST_PLUGIN
         if (wasEmbedded)
+        {
+            MDVST_HideHostWindow(mdvstHost.load()); // MDVST: its now-empty window too
             SetParent(hwnd, nullptr); // MDVST: out of the plugin's window, onto that window's monitor
+        }
 #endif
         SetWindowPos(hwnd, HWND_TOPMOST, info.rcMonitor.left, info.rcMonitor.top, width, height, SWP_DRAWFRAME | SWP_FRAMECHANGED);
 
