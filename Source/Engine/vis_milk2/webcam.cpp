@@ -18,6 +18,38 @@
 // DirectShow works on the OldOS builds as well as current Windows. qedit.h is
 // no longer shipped with the SDK and its old version conflicts with D3D9, so
 // declare only the two documented Sample Grabber interfaces used here.
+
+#include <cstdarg>
+#include <cstdio>
+#include "../mdvst_paths.h" // MDVST: the data folder, for webcam.log
+
+// MDVST: each step of opening the camera, with its result, appended to the data folder's webcam.log
+// (Daxy, 2026-11-02: in one Live set the camera never starts, light off, no error). Kept small:
+// started afresh past 256 KB. Capture threads only, a few lines per start.
+static void MDVST_WebcamLog(const wchar_t* format, ...)
+{
+    static std::mutex logMutex;
+    std::lock_guard<std::mutex> lock(logMutex);
+    wchar_t path[MAX_PATH];
+    swprintf_s(path, L"%swebcam.log", MDVST_DataDirectory());
+    WIN32_FILE_ATTRIBUTE_DATA info;
+    const bool big = GetFileAttributesExW(path, GetFileExInfoStandard, &info) && (info.nFileSizeHigh || info.nFileSizeLow > 256 * 1024);
+    FILE* f = nullptr;
+    if (_wfopen_s(&f, path, big ? L"w, ccs=UTF-8" : L"a, ccs=UTF-8") != 0 || !f)
+        return;
+    SYSTEMTIME t;
+    GetLocalTime(&t);
+    fwprintf(f, L"%04d-%02d-%02d %02d:%02d:%02d.%03d [%lu] ", t.wYear, t.wMonth, t.wDay, t.wHour, t.wMinute, t.wSecond,
+             t.wMilliseconds, GetCurrentThreadId());
+    va_list args;
+    va_start(args, format);
+    vfwprintf(f, format, args);
+    va_end(args);
+    fputwc(L'\n', f);
+    fclose(f);
+}
+#define MDVST_WLOG(step) MDVST_WebcamLog(L"%s: hr 0x%08lX", step, static_cast<unsigned long>(hr))
+
 namespace
 {
     using Microsoft::WRL::ComPtr;
@@ -243,6 +275,7 @@ struct BeatDropWebcam::Capture
                     const auto now = std::chrono::steady_clock::now();
                     if (++m_owner.streamFrames == 1)
                     {
+                        MDVST_WebcamLog(L"first picture"); // MDVST
                         m_owner.firstSampleSeconds = sampleSeconds;
                         m_owner.firstSampleClock = now;
                     }
@@ -271,8 +304,10 @@ struct BeatDropWebcam::Capture
     HRESULT Run(unsigned long long selection)
     {
         ComPtr<IGraphBuilder> graph;
+        MDVST_WebcamLog(L"start (selection %llu%s)", selection, selectionOnly ? L", list only" : L""); // MDVST
         HRESULT hr = CoCreateInstance(CLSID_FilterGraph, nullptr, CLSCTX_INPROC_SERVER,
             IID_PPV_ARGS(graph.GetAddressOf()));
+        MDVST_WLOG(L"filter graph"); // MDVST
         if (FAILED(hr)) return hr;
         ComPtr<ICaptureGraphBuilder2> builder;
         hr = CoCreateInstance(CLSID_CaptureGraphBuilder2, nullptr, CLSCTX_INPROC_SERVER,
@@ -283,6 +318,8 @@ struct BeatDropWebcam::Capture
 
         std::vector<CameraEntry> available;
         hr = EnumerateCameras(available);
+        MDVST_WebcamLog(L"cameras found: %zu (hr 0x%08lX)", available.size(), static_cast<unsigned long>(hr)); // MDVST
+        for (const auto& c : available) MDVST_WebcamLog(L"  camera: %s", c.device.name.c_str()); // MDVST
         if (FAILED(hr)) return hr;
         if (available.empty()) return HRESULT_FROM_WIN32(ERROR_NOT_FOUND);
         std::wstring selectedId;
@@ -303,6 +340,7 @@ struct BeatDropWebcam::Capture
         activeCameraIndex.store(index);
         ComPtr<IMoniker> camera = available[index].moniker;
         const std::wstring& cameraName = available[index].device.name;
+        MDVST_WebcamLog(L"using: %s", cameraName.c_str()); // MDVST
         if (stop.load() || requestedCamera.load() != selection) return S_OK;
         if (selectionOnly)
         {
@@ -311,7 +349,9 @@ struct BeatDropWebcam::Capture
         }
 
         ComPtr<IBaseFilter> source;
+        MDVST_WebcamLog(L"opening the camera..."); // MDVST
         hr = camera->BindToObject(nullptr, nullptr, IID_PPV_ARGS(source.GetAddressOf()));
+        MDVST_WLOG(L"camera opened"); // MDVST
         if (FAILED(hr)) return hr;
         hr = graph->AddFilter(source.Get(), L"BeatDrop webcam");
         if (FAILED(hr)) return hr;
@@ -337,8 +377,10 @@ struct BeatDropWebcam::Capture
         if (FAILED(hr)) return hr;
         hr = graph->AddFilter(sink.Get(), L"Webcam sink");
         if (FAILED(hr)) return hr;
+        MDVST_WebcamLog(L"connecting..."); // MDVST
         hr = builder->RenderStream(&PIN_CATEGORY_CAPTURE, &MEDIATYPE_Video,
             source.Get(), filter.Get(), sink.Get());
+        MDVST_WLOG(L"connected"); // MDVST
         if (FAILED(hr)) return hr;
 
         ScopedWebcamMediaType connected;
@@ -397,7 +439,9 @@ struct BeatDropWebcam::Capture
         if (FAILED(hr)) return hr;
         // The graph owns its event handle; it stays valid until Run returns.
         const HANDLE waitHandles[] = {controlEvent.handle, reinterpret_cast<HANDLE>(graphEvent)};
+        MDVST_WebcamLog(L"starting the stream (%dx%d)...", width, height); // MDVST
         hr = stop.load() ? S_OK : control->Run();
+        MDVST_WLOG(L"stream started"); // MDVST
         if (SUCCEEDED(hr))
         {
             PublishCameraChange(cameraName, selection);
@@ -456,6 +500,7 @@ struct BeatDropWebcam::Capture
         }
         if (!stop.load() && FAILED(hr))
             failure.store(hr);
+        MDVST_WebcamLog(L"capture thread ends: hr 0x%08lX%s", static_cast<unsigned long>(hr), stop.load() ? L" (asked to stop)" : L""); // MDVST
         finished.store(true);
     }
 };
@@ -617,6 +662,7 @@ void BeatDropWebcam::Stop()
         }
         else
         {
+            MDVST_WebcamLog(L"STUCK: the capture thread did not stop within 1.5 s; let go"); // MDVST
             m_capture->worker.detach();
             m_capture.release();
             HMODULE self = nullptr;
@@ -683,6 +729,7 @@ void BeatDropWebcam::Update(IDirect3DDevice9* device, std::wstring& error, std::
             && std::chrono::steady_clock::now() - m_capture->started > std::chrono::seconds(6))
         {
             m_capture->noPictureShown = true;
+            MDVST_WebcamLog(L"no picture after 6 s"); // MDVST
             *notice = L"Webcam: no picture. Another app may have the camera, or Windows camera access is off. W to turn it off";
         }
         if (!m_capture->haveFrame || m_capture->frame == m_uploadedFrame) return;
