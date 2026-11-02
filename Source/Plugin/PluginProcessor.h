@@ -26,10 +26,14 @@ public:
     ~MilkDropProcessor() override;
 
     void prepareToPlay(double sampleRate, int samplesPerBlock) override;
-    void releaseResources() override {}
+    void releaseResources() override;
+    // The device off in the DAW: hosts deactivate the plugin (releaseResources) or bypass it
+    // (processBlockBypassed). Either hides the visuals until it is on again (Daxy, 2026-11-02).
+    void processBlockBypassed(juce::AudioBuffer<float>&, juce::MidiBuffer&) override;
     bool isBusesLayoutSupported(const BusesLayout& layouts) const override;
     void processBlock(juce::AudioBuffer<float>&, juce::MidiBuffer&) override;
     using AudioProcessor::processBlock;
+    using AudioProcessor::processBlockBypassed;
 
     juce::AudioProcessorEditor* createEditor() override;
     bool hasEditor() const override { return true; }
@@ -76,6 +80,9 @@ private:
     std::atomic<double> sampleRate { 44100.0 };
     std::atomic<bool> feeding { false }; // audio thread writes only while the visuals are open
     std::atomic<int> dropped { 0 };      // blocks that did not fit (feeder stalled)
+    std::atomic<bool> hostActive { false }; // between prepareToPlay and releaseResources
+    std::atomic<bool> bypassed { false };   // the host's last block was a bypassed one
+    int sentSuspended = -1;                 // message thread: what the engine was last told
     std::unique_ptr<Feeder> feeder;
 
     juce::AudioParameterBool* hq = nullptr; // frame-rate cap: 30 off, 60 on

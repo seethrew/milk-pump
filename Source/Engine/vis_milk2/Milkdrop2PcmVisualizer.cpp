@@ -489,6 +489,9 @@ static void MDVST_FillHost(HWND hwnd)
 // Back into the editor after full screen / stretch, or out of the parked state. False if there
 // is no editor any more.
 static std::atomic<bool> mdvstParked { false };
+// MDVST: the device is off in the DAW (MDVST_Engine_SetSuspended): hidden, not drawing. Separate from
+// parked (the window closed): either one keeps the visuals hidden.
+static std::atomic<bool> mdvstSuspended { false };
 
 static bool MDVST_ReturnToHost(HWND hwnd)
 {
@@ -499,7 +502,8 @@ static bool MDVST_ReturnToHost(HWND hwnd)
     SetWindowLongW(hwnd, GWL_EXSTYLE, WS_EX_NOPARENTNOTIFY);
     SetParent(hwnd, host);
     MDVST_FillHost(hwnd);
-    ShowWindow(hwnd, SW_SHOWNA);
+    if (!mdvstSuspended.load()) // MDVST: a switched-off device stays hidden until it is on again
+        ShowWindow(hwnd, SW_SHOWNA);
     mdvstParked = false;
     return true;
 }
@@ -519,6 +523,7 @@ static void MDVST_Park(HWND hwnd)
 // (WM_APP..0xBFFF is the private range; above it are registered messages.)
 static const UINT WM_MDVST_PARK = WM_APP + 0x0D50;   // from the plugin: park (editor closing)
 static const UINT WM_MDVST_UNPARK = WM_APP + 0x0D51; // from the plugin: into mdvstHost
+static const UINT WM_MDVST_SUSPEND = WM_APP + 0x0D52; // from the plugin: wParam 1 = device off, 0 = on
 #endif
 
 // SPOUT
@@ -909,6 +914,27 @@ LRESULT CALLBACK StaticWndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lPara
     {
         if (mdvstParked.load())
             MDVST_ReturnToHost(hWnd);
+        return 0;
+    }
+    if (uMsg == WM_MDVST_SUSPEND) // MDVST: device off / on in the DAW
+    {
+        const bool off = wParam != 0;
+        if (off == mdvstSuspended.load())
+            return 0;
+        mdvstSuspended = off;
+        const bool outside = !MDVST_IsEmbedded(hWnd) && (fullscreen || stretch);
+        if (off)
+        {
+            ShowWindow(hWnd, SW_HIDE);
+            if (outside)
+                MDVST_ShowHostWindow(); // the plugin's own window back, as the visuals left it
+        }
+        else if (!mdvstParked.load())
+        {
+            if (outside && mdvstHost.load())
+                MDVST_HideHostWindow(mdvstHost.load());
+            ShowWindow(hWnd, SW_SHOWNA);
+        }
         return 0;
     }
 #endif
@@ -1355,6 +1381,7 @@ unsigned __stdcall CreateWindowAndRun(void* data) {
     MDVST_SensibleWindowRect(); // MDVST: open as a window, not screen-sized (Daxy, 2026-10-29)
     mdvstHostActive = -1;
     mdvstParked = false;
+    mdvstSuspended = false;
 #endif
 
     auto createRenderWindow = [&]() -> HWND {
@@ -1506,7 +1533,7 @@ unsigned __stdcall CreateWindowAndRun(void* data) {
         }
         else {
 #ifdef MDVST_PLUGIN
-            if (mdvstParked.load()) // MDVST: window closed: no drawing, almost no CPU
+            if (mdvstParked.load() || mdvstSuspended.load()) // MDVST: window closed / device off: no drawing, almost no CPU
             {
                 MsgWaitForMultipleObjects(0, nullptr, FALSE, 50, QS_ALLINPUT);
                 frame++;
@@ -2172,6 +2199,12 @@ void MDVST_Engine_Park()
 bool MDVST_Engine_Parked()
 {
     return mdvstParked.load();
+}
+
+void MDVST_Engine_SetSuspended(bool suspended)
+{
+    if (HWND w = mdvstRenderWindow.load())
+        PostMessageW(w, WM_MDVST_SUSPEND, suspended ? 1 : 0, 0);
 }
 
 bool MDVST_Engine_IsRunning()

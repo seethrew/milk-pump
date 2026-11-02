@@ -378,6 +378,53 @@ int main(int argc, char** argv)
             check(IsWindowVisible(win.frame()) != FALSE, "and the plugin window is shown again");
         }
 
+        {   // The device switched off in the DAW (Daxy, 2026-11-02): Live deactivates the plugin;
+            // other hosts bypass it. Either hides the visuals, in the window or full screen.
+            auto idle = [](double seconds) // the host stops processing; its UI thread runs on
+            {
+                const auto start = juce::Time::getMillisecondCounterHiRes();
+                while (juce::Time::getMillisecondCounterHiRes() - start < seconds * 1000.0) { pumpMessages(); Sleep(5); }
+            };
+            p->releaseResources();
+            idle(0.6);
+            check(renderWindows().empty(), "device off: the visuals are hidden");
+            p->prepareToPlay(48000.0, 480);
+            runRealTime(*p, 48000.0, 0.6);
+            check(insideAndFilling(win.frame()), "device on: back inside the plugin window");
+
+            auto v = renderWindows();
+            if (v.size() == 1)
+                doubleClick(v[0]);
+            runRealTime(*p, 48000.0, 1.5);
+            p->releaseResources();
+            idle(0.6);
+            check(renderWindows().empty() && IsWindowVisible(win.frame()),
+                  "device off in full screen: visuals hidden, the plugin window shown");
+            p->prepareToPlay(48000.0, 480);
+            runRealTime(*p, 48000.0, 0.6);
+            v = renderWindows();
+            check(v.size() == 1 && isFullScreen(v[0]) && !IsWindowVisible(win.frame()),
+                  "device on: full screen again, the plugin window hidden");
+            if (v.size() == 1)
+                doubleClick(v[0]);
+            runRealTime(*p, 48000.0, 1.5);
+            check(insideAndFilling(win.frame()), "and back inside after full screen");
+
+            juce::AudioBuffer<float> buf(2, 480);
+            juce::MidiBuffer midi;
+            const auto start = juce::Time::getMillisecondCounterHiRes();
+            while (juce::Time::getMillisecondCounterHiRes() - start < 600.0)
+            {
+                buf.clear();
+                p->processBlockBypassed(buf, midi);
+                pumpMessages();
+                Sleep(10);
+            }
+            check(renderWindows().empty(), "bypassed: the visuals are hidden");
+            runRealTime(*p, 48000.0, 0.6);
+            check(insideAndFilling(win.frame()), "not bypassed: back again");
+        }
+
         {   // a second copy, its window open too
             auto q = load(fm, d, 48000.0, 480);
             HostWindow win2;

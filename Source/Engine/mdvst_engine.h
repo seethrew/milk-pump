@@ -32,6 +32,10 @@ void MDVST_Engine_ReleaseHost();
 // with an editor's window puts them back as they were. Waits (pumping) until they are out.
 void MDVST_Engine_Park();
 bool MDVST_Engine_Parked();
+// The device switched off in the DAW (or bypassed): the visuals hide and pause wherever they are,
+// in the plugin's window or full screen, menus and all; switched on again they come back as they
+// were. Any thread; never waits.
+void MDVST_Engine_SetSuspended(bool suspended);
 
 // The preset saved with the set. CurrentPreset: the one showing now (relative to the data folder
 // when inside it) and whether it is locked; false before the first one has loaded. SetStartPreset

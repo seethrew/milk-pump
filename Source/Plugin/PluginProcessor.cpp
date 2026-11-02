@@ -4,6 +4,7 @@
 
 #include "mdvst_engine.h"
 #include "mdvst_controls.h"
+#include "mdvst_paths.h"
 
 std::atomic<MilkDropProcessor*> MilkDropProcessor::owner { nullptr };
 
@@ -122,6 +123,26 @@ void MilkDropProcessor::timerCallback()
         MDVST_Engine_SetMaxFps(sentHq ? 60 : 30);
     }
 
+    // The device off (deactivated or bypassed): the visuals hide; on again: back as they were.
+    // Told on every change, and again whenever the visuals (re)start.
+    if (visualsOpen())
+    {
+        const int off = (!hostActive.load() || bypassed.load()) ? 1 : 0;
+        if (off != sentSuspended)
+        {
+            // Which signal the host used, in the data folder's plugin.log (a line per change).
+            if (sentSuspended >= 0)
+                juce::File(juce::String(MDVST_DataDirectory())).getChildFile("plugin.log").appendText(
+                    juce::Time::getCurrentTime().formatted("%Y-%m-%d %H:%M:%S ")
+                    + (off ? juce::String("device off (") + (hostActive.load() ? "bypassed" : "deactivated") + ")"
+                           : juce::String("device on")) + "\n");
+            sentSuspended = off;
+            MDVST_Engine_SetSuspended(off != 0);
+        }
+    }
+    else
+        sentSuspended = -1;
+
     refreshPreset(); // kept current, so the state is right even after the visuals close
 }
 
@@ -193,6 +214,18 @@ bool MilkDropProcessor::visualsOpen() const
 void MilkDropProcessor::prepareToPlay(double newSampleRate, int)
 {
     sampleRate = newSampleRate;
+    hostActive = true;
+}
+
+void MilkDropProcessor::releaseResources()
+{
+    hostActive = false;
+}
+
+void MilkDropProcessor::processBlockBypassed(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midi)
+{
+    bypassed.store(true, std::memory_order_relaxed);
+    AudioProcessor::processBlockBypassed(buffer, midi); // the audio passes through as usual
 }
 
 bool MilkDropProcessor::isBusesLayoutSupported(const BusesLayout& layouts) const
@@ -205,6 +238,7 @@ bool MilkDropProcessor::isBusesLayoutSupported(const BusesLayout& layouts) const
 
 void MilkDropProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer&)
 {
+    bypassed.store(false, std::memory_order_relaxed);
     // Pass-through: input and output share this buffer, so leaving it alone is bit-exact.
     const int numIn = getTotalNumInputChannels();
     for (int ch = numIn; ch < getTotalNumOutputChannels(); ++ch)
