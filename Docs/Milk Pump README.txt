@@ -210,7 +210,9 @@
                                 shortcut: keep only the installed one.
    keys do nothing ............ click the visuals first.
    webcam: "no picture" ....... the camera didn't start (its light stays
-                                off): another app may have it, or Windows
+                                off). Another plugin in the set can block
+                                it (seen with an unofficial copy of an old
+                                effect): try the set without it. Or Windows
                                 camera access is off. W again turns it off.
    2nd copy in a set is blank . as designed: one visualiser per set.
 

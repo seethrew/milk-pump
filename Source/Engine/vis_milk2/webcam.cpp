@@ -730,7 +730,7 @@ void BeatDropWebcam::Update(IDirect3DDevice9* device, std::wstring& error, std::
         {
             m_capture->noPictureShown = true;
             MDVST_WebcamLog(L"no picture after 6 s"); // MDVST
-            *notice = L"Webcam: no picture. Another app may have the camera, or Windows camera access is off. W to turn it off";
+            *notice = L"Webcam: no picture. Another plugin in this set may be blocking the camera, or Windows camera access is off. W to turn it off";
         }
         if (!m_capture->haveFrame || m_capture->frame == m_uploadedFrame) return;
         width = m_capture->width;
