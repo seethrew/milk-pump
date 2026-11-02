@@ -251,6 +251,32 @@ int main(int argc, char** argv)
     std::printf("      %s by %s, %d in / %d out\n", d.name.toRawUTF8(), d.manufacturerName.toRawUTF8(),
                 d.numInputChannels, d.numOutputChannels);
 
+    // "HostTest webcam N [secs]": the plugin window open, W (webcam mode) pressed N times, 2.5 s (or secs) apart, as
+    // in a DAW (Daxy, 2026-11-02: cycling the webcam crashed Live). Survives = prints "survived".
+    if (argc >= 2 && std::strcmp(argv[1], "webcam") == 0)
+    {
+        auto p = load(fm, d, 48000.0, 480);
+        HostWindow win;
+        if (p == nullptr || !win.open(*p))
+            return 1;
+        runRealTime(*p, 48000.0, 4.0);
+        const int presses = argc >= 3 ? std::atoi(argv[2]) : 8;
+        const double every = argc >= 4 ? std::atof(argv[3]) : 2.5; // seconds between presses
+        for (int i = 1; i <= presses; ++i)
+        {
+            auto w = renderWindows();
+            if (w.size() != 1)
+                return 2;
+            PostMessageW(w[0], WM_CHAR, 'w', 1);
+            std::printf("press %d\n", i);
+            std::fflush(stdout);
+            runRealTime(*p, 48000.0, every);
+        }
+        std::printf("survived %d presses\n", presses);
+        win.close();
+        return 0;
+    }
+
     if (argc >= 3 && std::strncmp(argv[1], "quit-", 5) == 0)
         return quitTest(fm, d, std::strcmp(argv[1], "quit-open") == 0, std::strcmp(argv[2], "exitprocess") == 0);
 

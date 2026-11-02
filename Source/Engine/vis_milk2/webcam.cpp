@@ -185,6 +185,8 @@ struct BeatDropWebcam::Capture
     std::chrono::steady_clock::time_point firstSampleClock;
     std::wstring notice;
     unsigned long long noticeSelection = 0;
+    std::chrono::steady_clock::time_point started; // MDVST: for the "no picture yet" note
+    bool noPictureShown = false;                    // MDVST: render thread only
 
     void PublishCameraChange(const std::wstring& name, unsigned long long selection)
     {
@@ -430,6 +432,10 @@ struct BeatDropWebcam::Capture
 
     void Main()
     {
+        // MDVST: test hook (HostTest webcam-stuck): a camera that hangs while opening, as one did in
+        // Daxy's Live set. Never set outside the tests.
+        if (GetEnvironmentVariableW(L"MDVST_TEST_STUCK_WEBCAM", nullptr, 0) > 0)
+            Sleep(20000);
         const HRESULT initialized = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
         HRESULT hr = initialized;
         if (SUCCEEDED(initialized))
@@ -484,6 +490,7 @@ bool BeatDropWebcam::StartCapture(IDirect3DDevice9* device, bool selectionOnly, 
         m_capture->requestedDevice = m_selectedDevice;
         m_capture->requestedIndex = m_cameraSelection;
         m_capture->requestedCamera.store(m_selectionRevision);
+        m_capture->started = std::chrono::steady_clock::now(); // MDVST
         m_capture->worker = std::thread(&Capture::Main, m_capture.get());
         return true;
     }
@@ -595,9 +602,27 @@ void BeatDropWebcam::Stop()
             m_cameraSelection = m_capture->activeCameraIndex.load();
         m_capture->stop.store(true);
         m_capture->controlEvent.Signal();
-        if (m_capture->worker.joinable())
-            m_capture->worker.join();
-        m_capture.reset();
+        // MDVST: never wait long for the camera (Daxy, 2026-11-02). In one Live set the camera never
+        // opened (its light stayed off): the worker sat inside DirectShow, this join waited forever on
+        // the render thread, and Live froze ("not responding"). Wait up to 1.5 s; a worker still stuck
+        // after that is let go, with its Capture left to it (leaked on purpose: it still uses it), and
+        // the plugin's DLL is pinned so it is never unloaded under that thread.
+        for (int waited = 0; waited < 1500 && !m_capture->finished.load(); waited += 10)
+            Sleep(10);
+        if (m_capture->finished.load() || !m_capture->worker.joinable())
+        {
+            if (m_capture->worker.joinable())
+                m_capture->worker.join();
+            m_capture.reset();
+        }
+        else
+        {
+            m_capture->worker.detach();
+            m_capture.release();
+            HMODULE self = nullptr;
+            GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_PIN,
+                reinterpret_cast<LPCWSTR>(&WebcamFrameSize), &self);
+        }
     }
     m_mode = Off;
     ReleaseDeviceResources();
@@ -653,6 +678,13 @@ void BeatDropWebcam::Update(IDirect3DDevice9* device, std::wstring& error, std::
         std::lock_guard<std::mutex> lock(m_capture->mutex);
         if (notice && m_capture->noticeSelection == m_capture->requestedCamera.load())
             notice->swap(m_capture->notice);
+        // MDVST: a camera that never delivers (in use elsewhere, blocked, stuck) says so once.
+        if (!m_capture->haveFrame && !m_capture->noPictureShown && notice && notice->empty()
+            && std::chrono::steady_clock::now() - m_capture->started > std::chrono::seconds(6))
+        {
+            m_capture->noPictureShown = true;
+            *notice = L"Webcam: no picture. Another app may have the camera, or Windows camera access is off. W to turn it off";
+        }
         if (!m_capture->haveFrame || m_capture->frame == m_uploadedFrame) return;
         width = m_capture->width;
         height = m_capture->height;

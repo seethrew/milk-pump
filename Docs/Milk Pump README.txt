@@ -209,6 +209,9 @@
    two Milk Pumps in a list ... an old copy is where the DAW scans, or an old
                                 shortcut: keep only the installed one.
    keys do nothing ............ click the visuals first.
+   webcam: "no picture" ....... the camera didn't start (its light stays
+                                off): another app may have it, or Windows
+                                camera access is off. W again turns it off.
    2nd copy in a set is blank . as designed: one visualiser per set.
 
   ============================================================================
