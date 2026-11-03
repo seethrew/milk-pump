@@ -513,6 +513,7 @@ static bool MDVST_ReturnToHost(HWND hwnd)
 // loop stops drawing until a new editor takes it back (MDVST_Engine_Start). Render thread only.
 static void MDVST_Park(HWND hwnd)
 {
+    ResetCursorAutoHide(true); // the pointer back, if full screen had hidden it
     ShowWindow(hwnd, SW_HIDE);
     SetWindowLongW(hwnd, GWL_STYLE, WS_POPUP);
     SetWindowLongW(hwnd, GWL_EXSTYLE, WS_EX_TOOLWINDOW); // no taskbar button while hidden
@@ -925,6 +926,7 @@ LRESULT CALLBACK StaticWndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lPara
         const bool outside = !MDVST_IsEmbedded(hWnd) && (fullscreen || stretch);
         if (off)
         {
+            ResetCursorAutoHide(true); // full screen may have hidden the pointer: never leave it hidden over the DAW
             ShowWindow(hWnd, SW_HIDE);
             if (outside)
                 MDVST_ShowHostWindow(); // the plugin's own window back, as the visuals left it
