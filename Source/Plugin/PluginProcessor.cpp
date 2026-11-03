@@ -125,16 +125,26 @@ void MilkDropProcessor::timerCallback()
 
     // The device off (deactivated or bypassed): the visuals hide; on again: back as they were.
     // Told on every change, and again whenever the visuals (re)start.
+    // No audio at all for half a second also counts as off: Live keeps processing a device that
+    // is on, playing or not, and simply stops calling one that is switched off.
+    const double now = juce::Time::getMillisecondCounterHiRes();
+    if (blocks.load() != lastBlocks)
+    {
+        lastBlocks = blocks.load();
+        lastBlockTime = now;
+    }
+    const bool silent = now - lastBlockTime > 500.0;
     if (visualsOpen())
     {
-        const int off = (!hostActive.load() || bypassed.load()) ? 1 : 0;
+        const int off = (!hostActive.load() || bypassed.load() || processingStopped.load() || silent) ? 1 : 0;
         if (off != sentSuspended)
         {
             // Which signal the host used, in the data folder's plugin.log (a line per change).
             if (sentSuspended >= 0)
                 juce::File(juce::String(MDVST_DataDirectory())).getChildFile("plugin.log").appendText(
                     juce::Time::getCurrentTime().formatted("%Y-%m-%d %H:%M:%S ")
-                    + (off ? juce::String("device off (") + (hostActive.load() ? "bypassed" : "deactivated") + ")"
+                    + (off ? juce::String("device off (") + (!hostActive.load() ? "deactivated" : bypassed.load() ? "bypassed"
+                                                             : processingStopped.load() ? "processing stopped" : "no audio") + ")"
                            : juce::String("device on")) + "\n");
             sentSuspended = off;
             MDVST_Engine_SetSuspended(off != 0);
@@ -222,9 +232,16 @@ void MilkDropProcessor::releaseResources()
     hostActive = false;
 }
 
+void MilkDropProcessor::reset()
+{
+    processingStopped = true;
+}
+
 void MilkDropProcessor::processBlockBypassed(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midi)
 {
     bypassed.store(true, std::memory_order_relaxed);
+    processingStopped.store(false, std::memory_order_relaxed);
+    blocks.fetch_add(1, std::memory_order_relaxed);
     AudioProcessor::processBlockBypassed(buffer, midi); // the audio passes through as usual
 }
 
@@ -239,6 +256,8 @@ bool MilkDropProcessor::isBusesLayoutSupported(const BusesLayout& layouts) const
 void MilkDropProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer&)
 {
     bypassed.store(false, std::memory_order_relaxed);
+    processingStopped.store(false, std::memory_order_relaxed);
+    blocks.fetch_add(1, std::memory_order_relaxed);
     // Pass-through: input and output share this buffer, so leaving it alone is bit-exact.
     const int numIn = getTotalNumInputChannels();
     for (int ch = numIn; ch < getTotalNumOutputChannels(); ++ch)

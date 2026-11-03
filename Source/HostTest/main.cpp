@@ -423,6 +423,12 @@ int main(int argc, char** argv)
             check(renderWindows().empty(), "bypassed: the visuals are hidden");
             runRealTime(*p, 48000.0, 0.6);
             check(insideAndFilling(win.frame()), "not bypassed: back again");
+
+            // Live: a switched-off device is simply no longer processed.
+            idle(1.0);
+            check(renderWindows().empty(), "no audio at all (Live's device off): the visuals are hidden");
+            runRealTime(*p, 48000.0, 0.6);
+            check(insideAndFilling(win.frame()), "audio again: back again");
         }
 
         {   // a second copy, its window open too
@@ -430,8 +436,12 @@ int main(int argc, char** argv)
             HostWindow win2;
             if (q != nullptr)
                 win2.open(*q);
-            if (q != nullptr)
-                runRealTime(*q, 48000.0, 2.0);
+            // A DAW feeds both copies; one with no audio at all counts as switched off (Live).
+            for (int i = 0; q != nullptr && i < 10; ++i)
+            {
+                runRealTime(*q, 48000.0, 0.1);
+                runRealTime(*p, 48000.0, 0.1);
+            }
             check(renderWindows().size() == 1, "a second copy's window adds no second visuals");
             win2.close();
         }

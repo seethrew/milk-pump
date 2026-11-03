@@ -27,9 +27,11 @@ public:
 
     void prepareToPlay(double sampleRate, int samplesPerBlock) override;
     void releaseResources() override;
-    // The device off in the DAW: hosts deactivate the plugin (releaseResources) or bypass it
-    // (processBlockBypassed). Either hides the visuals until it is on again (Daxy, 2026-11-02).
+    // The device off in the DAW: hosts deactivate the plugin (releaseResources), bypass it
+    // (processBlockBypassed), or just stop processing it (Live: reset(), then no more blocks).
+    // Any of these hides the visuals until it is on again (Daxy, 2026-11-02/03).
     void processBlockBypassed(juce::AudioBuffer<float>&, juce::MidiBuffer&) override;
+    void reset() override;
     bool isBusesLayoutSupported(const BusesLayout& layouts) const override;
     void processBlock(juce::AudioBuffer<float>&, juce::MidiBuffer&) override;
     using AudioProcessor::processBlock;
@@ -82,6 +84,10 @@ private:
     std::atomic<int> dropped { 0 };      // blocks that did not fit (feeder stalled)
     std::atomic<bool> hostActive { false }; // between prepareToPlay and releaseResources
     std::atomic<bool> bypassed { false };   // the host's last block was a bypassed one
+    std::atomic<bool> processingStopped { false }; // reset() since the last block
+    std::atomic<uint32_t> blocks { 0 };      // audio blocks seen (processed or bypassed)
+    uint32_t lastBlocks = 0;                 // message thread: the count at the last change
+    double lastBlockTime = 0.0;              // message thread: when it last changed (ms)
     int sentSuspended = -1;                 // message thread: what the engine was last told
     std::unique_ptr<Feeder> feeder;
 
