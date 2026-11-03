@@ -54,6 +54,8 @@
      a projector. Double-click again or ESC to come back.
    * Closing the window pauses the visuals. Reopen it and they're back as you
      left them: same size, same preset, any menu still open.
+   * Switching the device off hides the visuals (full screen too), and on
+     again brings them back the same way.
    * Your set remembers its preset (and its lock), the window size, HQ and
      Speed.
    * One Milk Pump per set. A second copy passes audio through and shows a
